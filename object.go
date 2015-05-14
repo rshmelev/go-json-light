@@ -5,6 +5,7 @@ import (
 	"errors"
 	"fmt"
 	"io"
+	"reflect"
 	"strings"
 	"time"
 )
@@ -12,7 +13,65 @@ import (
 // it should be easy to add super functionality to existing map using simple type casting
 type JSONObject map[string]interface{}
 
-func NewObject(mapp ...map[string]interface{}) IObject {
+func NewEmptyObject() IObject {
+	x := JSONObject(make(map[string]interface{}))
+	return IObject(&x)
+}
+
+func NewObjectOrNil(string_or_bytes_or_map_or_struct ...interface{}) IObject {
+	o, _ := NewObject(string_or_bytes_or_map_or_struct...)
+	return o
+}
+
+func NewObjectOrDie(string_or_bytes_or_map_or_struct ...interface{}) IObject {
+	o, e := NewObject(string_or_bytes_or_map_or_struct...)
+	if e != nil {
+		panic(e)
+	}
+	if o == nil {
+		panic("nil object created")
+	}
+	return o
+}
+
+func NewObject(string_or_bytes_or_map_or_struct ...interface{}) (IObject, error) {
+	paramsLen := len(string_or_bytes_or_map_or_struct)
+	if paramsLen > 0 {
+		p := string_or_bytes_or_map_or_struct[0]
+		v := reflect.ValueOf(p)
+		if v.Kind() == reflect.Ptr {
+			if v.IsNil() {
+				return NewObject()
+			}
+			p = v.Elem().Interface()
+			v = reflect.ValueOf(p)
+		}
+		switch v.Kind() {
+		case reflect.Map:
+			m, ok := p.(map[string]interface{})
+			if !ok {
+				return nil, errors.New("map should have type: map[string]interface{}")
+			}
+			return NewObjectFromMap(m), nil
+		case reflect.String:
+			return NewObjectFromString(v.String())
+		case reflect.Struct:
+			return NewObjectFromStruct(v.Interface())
+		case reflect.Slice:
+			m, ok := p.([]byte)
+			if !ok {
+				fmt.Println(v.Type(), v.Kind(), v)
+				return nil, errors.New("slice should have type: []byte")
+			}
+			return NewObjectFromBytes(m)
+		}
+		return nil, errors.New("unsupported input type")
+	} else {
+		return NewEmptyObject(), nil
+	}
+}
+
+func NewObjectFromMap(mapp ...map[string]interface{}) IObject {
 	if len(mapp) > 1 {
 		panic("brrr")
 	}
@@ -24,8 +83,7 @@ func NewObject(mapp ...map[string]interface{}) IObject {
 		x := JSONObject(mapp[0]) //mapp.(JSONObject)
 		return IObject(&x)
 	} else {
-		x := JSONObject(make(map[string]interface{}))
-		return IObject(&x)
+		return NewEmptyObject()
 	}
 }
 
@@ -43,6 +101,24 @@ func NewObjectFromFile(url string, timeout time.Duration) (IObject, error, int) 
 func NewObjectFromString(str string) (IObject, error) {
 	return NewObjectFromBytes([]byte(str))
 }
+func NewObjectFromStruct(a interface{}) (IObject, error) {
+	b, e := json.Marshal(a)
+	if e != nil {
+		return nil, e
+	}
+	return NewObjectFromBytes(b)
+}
+func NewObjectFromStructOrDie(a interface{}) IObject {
+	b, e := json.Marshal(a)
+	if e != nil {
+		panic("cannot make json from object")
+	}
+	r, e2 := NewObjectFromBytes(b)
+	if e2 != nil {
+		panic("cannot create object from bytes: " + string(b) + " / " + e2.Error())
+	}
+	return r
+}
 func NewObjectFromBytes(bytes []byte) (IObject, error) {
 	var res interface{}
 	if err := json.Unmarshal(bytes, &res); err != nil {
@@ -53,7 +129,7 @@ func NewObjectFromBytes(bytes []byte) (IObject, error) {
 		return nil, TypeConvertError{}
 	}
 
-	return NewObject(res2), nil
+	return NewObject(res2)
 }
 
 //-----------------------------------------
@@ -201,6 +277,19 @@ func (this *JSONObject) putArray(key string, a *JSONArray) (interface{}, error) 
 	return nil, nil
 }
 
+func (this *JSONObject) PutAll(o IObject) error {
+	if o == nil {
+		return errors.New("PutAll called with nil param")
+	}
+	m := o.ToMap()
+	for k, v := range m {
+		if _, e := this.Put(k, v); e != nil {
+			return e
+		}
+	}
+	return nil
+}
+
 func (this *JSONObject) Put(key string, v interface{}) (interface{}, error) { // XJSON
 	thismap := this.ToMap()
 	var prev interface{}
@@ -316,8 +405,8 @@ func (this *JSONObject) GetObject(key string) (IObject, error) {
 	if !arrok {
 		return nil, TypeConvertError{}
 	}
-	res := NewObject(mm)
-	return res, nil
+
+	return NewObject(mm)
 }
 func (this *JSONObject) GetLong(key string) (int64, error) {
 	a, ok := this.Get(key)

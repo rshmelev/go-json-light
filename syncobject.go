@@ -101,6 +101,11 @@ func (this *SynchronizedObjectWrapper) Put(key string, v interface{}) (interface
 	defer this.Mutex.Unlock()
 	return this.O.Put(key, v)
 }
+func (this *SynchronizedObjectWrapper) PutAll(v IObject) error {
+	this.Mutex.Lock()
+	defer this.Mutex.Unlock()
+	return this.O.PutAll(v)
+}
 
 func (this *SynchronizedObjectWrapper) FillStruct(s interface{}) error {
 	this.Mutex.Lock()

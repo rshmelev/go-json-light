@@ -75,6 +75,7 @@ type IObject interface {
 
 	// returns previous value or nil if didn't exist
 	Put(key string, value interface{}) (interface{}, error)
+	PutAll(o IObject) error
 	// returns removed value
 	Remove(key string) interface{}
 	Rename(oldkey string, newkey string) bool
@@ -113,6 +114,7 @@ type IArray interface {
 	Remove(index int) interface{}
 
 	ToSlice() ([]interface{}, bool)
+	ToSliceOrDie() []interface{}
 }
 
 //-------------------------------------
@@ -175,6 +177,23 @@ func FloatValue(a interface{}) (float64, bool) {
 	}
 }
 
+// sllllllloooooowwwww
+func CopyObject(from interface{}, to interface{}) error {
+	mmap, err := StructToMap(from)
+	if err != nil {
+		return err
+	}
+	return mmap.FillStruct(to)
+}
+
+func StructToMapOrDie(a interface{}) IObject {
+	res, err := StructToMap(a)
+	if err != nil {
+		panic(err)
+	}
+	return res
+}
+
 // encode to json -> decode from json.
 // SLOOOOW
 func StructToMap(a interface{}) (IObject, error) {
@@ -185,8 +204,8 @@ func StructToMap(a interface{}) (IObject, error) {
 	var f interface{}
 	err = json.Unmarshal(b, &f)
 	if res, ok := f.(map[string]interface{}); ok {
-		x := NewObject(res)
-		return x, nil
+
+		return NewObject(res)
 	}
 	return nil, TypeConvertError{}
 }

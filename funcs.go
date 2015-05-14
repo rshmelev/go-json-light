@@ -6,7 +6,7 @@ import (
 )
 
 func CompareObjects(oldo IObject, newo IObject) (IObject, IObject, IObject, IObject) {
-	deleted, created, modified, unchanged := NewObject(), NewObject(), NewObject(), NewObject()
+	deleted, created, modified, unchanged := NewObjectOrNil(), NewObjectOrNil(), NewObjectOrNil(), NewObjectOrNil()
 
 	left := make([]string, newo.Length())
 

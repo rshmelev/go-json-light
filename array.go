@@ -94,6 +94,14 @@ func (this *JSONArray) Write(writer *io.Writer) {
 	enc.Encode(this.data)
 }
 
+func (this *JSONArray) ToSliceOrDie() []interface{} {
+	x, ok := this.ToSlice()
+	if !ok {
+		panic("failed getting slice from Array")
+	}
+	return x
+}
+
 func (this *JSONArray) ToSlice() ([]interface{}, bool) {
 	if this.data != nil {
 		return *(this.data), true
@@ -388,8 +396,8 @@ func (this *JSONArray) GetObject(index int) (IObject, error) {
 	if !arrok {
 		return nil, TypeConvertError{}
 	}
-	res := NewObject(mm)
-	return res, nil
+	res, eee := NewObject(mm)
+	return res, eee
 }
 func (this *JSONArray) GetLong(index int) (int64, error) {
 	a, ok := this.Get(index)
@@ -473,7 +481,7 @@ func (this *JSONArray) OptObject(index int, defaultvalue ...IObject) IObject {
 		if len(defaultvalue) > 0 {
 			return defaultvalue[0]
 		}
-		o := NewObject()
+		o, _ := NewObject()
 		return o
 	}
 	return v
